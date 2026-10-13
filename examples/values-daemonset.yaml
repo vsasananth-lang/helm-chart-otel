@@ -1,0 +1,55 @@
+# DaemonSet Mode (Agent Pattern)
+# Best used for running on every Kubernetes node to collect node/host metrics,
+# container stdout/stderr logs, kubelet stats, and pod metadata.
+
+mode: daemonset
+
+image:
+  repository: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s
+  tag: "0.161.0"
+  pullPolicy: IfNotPresent
+
+command:
+  name: "otelcol-k8s"
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Pre-configured Kubernetes collectors
+presets:
+  # Collects container logs from /var/log/pods
+  logsCollection:
+    enabled: true
+    storeCheckpoints: true
+  # Collects host CPU, memory, network, and disk metrics
+  hostMetrics:
+    enabled: true
+  # Collects pod/container CPU and memory metrics from Kubelet
+  kubeletMetrics:
+    enabled: true
+  # Enriches telemetry with k8s pod, namespace, and node labels/annotations
+  kubernetesAttributes:
+    enabled: true
+    extractAllPodLabels: true
+    extractAllPodAnnotations: false
+
+serviceAccount:
+  create: true
+
+clusterRole:
+  create: true
+
+config:
+  exporters:
+    debug:
+      verbosity: basic
+    # Example: Forward to an OpenTelemetry Gateway Deployment or upstream collector
+    # otlp:
+    #   endpoint: "opentelemetry-collector.monitoring.svc.cluster.local:4317"
+    #   tls:
+    #     insecure: true

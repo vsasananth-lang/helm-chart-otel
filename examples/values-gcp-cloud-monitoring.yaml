@@ -1,0 +1,98 @@
+# Deployment Mode: Google Cloud Monitoring Metrics Integration
+# Uses the Contrib image to poll metrics from GCP Cloud Monitoring API
+# or export metrics to Google Cloud Monitoring.
+
+mode: deployment
+
+# Use replicaCount: 1 when polling Cloud Monitoring to prevent duplicate time-series and excessive API calls
+replicaCount: 1
+
+image:
+  repository: otel/opentelemetry-collector-contrib
+  tag: "0.161.0"
+  pullPolicy: IfNotPresent
+
+command:
+  name: "otelcol-contrib"
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+# --- AUTHENTICATION ---
+# Option 1: On GKE using Workload Identity (Recommended)
+serviceAccount:
+  create: true
+  name: otel-collector-sa
+  annotations:
+    iam.gke.io/gcp-service-account: "otel-collector@YOUR_GCP_PROJECT_ID.iam.gserviceaccount.com"
+
+# Option 2: Outside GKE using Service Account Key JSON mounted from Secret
+# extraVolumes:
+#   - name: gcp-sa-key
+#     secret:
+#       secretName: gcp-sa-key-secret
+# extraVolumeMounts:
+#   - name: gcp-sa-key
+#     mountPath: /var/secrets/google
+#     readOnly: true
+# extraEnvs:
+#   - name: GOOGLE_APPLICATION_CREDENTIALS
+#     value: /var/secrets/google/key.json
+
+# --- COLLECTOR PIPELINE CONFIGURATION ---
+config:
+  receivers:
+    # 1. Pulling metrics FROM Google Cloud Monitoring API
+    googlecloudmonitoring:
+      project_id: "YOUR_GCP_PROJECT_ID"
+      collection_interval: 60s
+      metrics_list:
+        - metric_name: "compute.googleapis.com/instance/cpu/utilization"
+        - metric_name: "pubsub.googleapis.com/subscription/num_undelivered_messages"
+        - metric_name: "cloudsql.googleapis.com/database/cpu/utilization"
+
+    # Standard OTLP receiver (for applications sending telemetry to this collector)
+    otlp:
+      protocols:
+        grpc:
+          endpoint: ${env:MY_POD_IP}:4317
+        http:
+          endpoint: ${env:MY_POD_IP}:4318
+
+  processors:
+    memory_limiter:
+      check_interval: 1s
+      limit_percentage: 80
+      spike_limit_percentage: 25
+    batch:
+      timeout: 10s
+      send_batch_max_size: 1000
+
+  exporters:
+    # Print metrics to pod stdout for debugging
+    debug:
+      verbosity: basic
+
+    # Example A: Forward pulled GCP metrics to an external backend (e.g. Datadog, Prometheus, Tempo)
+    # otlp:
+    #   endpoint: "tempo.monitoring.svc.cluster.local:4317"
+    #   tls:
+    #     insecure: true
+
+    # Example B: Export application metrics TO Google Cloud Monitoring
+    # googlecloud:
+    #   project: "YOUR_GCP_PROJECT_ID"
+    #   metric:
+    #     prefix: "custom.googleapis.com"
+
+  service:
+    pipelines:
+      metrics:
+        receivers: [googlecloudmonitoring]
+        processors: [memory_limiter, batch]
+        exporters: [debug]
