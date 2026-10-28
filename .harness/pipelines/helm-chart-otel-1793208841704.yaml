@@ -20,12 +20,18 @@ pipeline:
           execution:
             steps:
               - step:
-                  identifier: echo
-                  name: echo
+                  identifier: build_and_push_docker_image
+                  name: Build and Push Docker Image
                   spec:
-                    command: echo hello world
+                    connectorRef: <+input>
+                    repo: <+input>
+                    tags:
+                      - <+pipeline.sequenceId>
+                      - latest
+                    dockerfile: Dockerfile
+                    caching: true
                   timeout: ""
-                  type: Run
+                  type: BuildAndPushDockerRegistry
           platform:
             arch: Amd64
             os: Linux
