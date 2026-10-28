@@ -1,0 +1,14 @@
+inputSet:
+  name: Build_vsasananth_lang_helm_chart_otel_1793208860059-push-trigger-input-set
+  identifier: Build_vsasananth_lang_helm_chart_otel_1793208860059pushtriggerinputset
+  orgIdentifier: default
+  projectIdentifier: default_project
+  pipeline:
+    identifier: Build_vsasananth_lang_helm_chart_otel_1793208860059
+    properties:
+      ci:
+        codebase:
+          build:
+            type: branch
+            spec:
+              branch: <+trigger.branch>
